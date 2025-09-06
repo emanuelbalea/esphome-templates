@@ -1,0 +1,149 @@
+# arlec-pc191ha-universal.yaml
+# Flash this single binary to all WB2S-based ARLEC PC191HA plugs
+
+substitutions:
+  base_name: "arlec-pc191ha" #hostname and node names
+  id_prefix: "arlec_pc191ha" # ids and lambdas
+  model_name: "ARLEC PC191HA"
+
+esphome:
+  name: ${base_name}
+  comment: ${model_name}
+  name_add_mac_suffix: true       # ensures unique node names like arlec_pc191ha-80f0a1
+  project:
+    name: emanuelbalea.arlec_pc191ha
+    version: "1.0.0"  # bump when you ship updates
+
+dashboard_import:
+  # GitHub shorthand – points to the YAML in your repo
+  package_import_url: github://emanuelbalea/esphome-templates/arlec-pc191ha/arlec-pc191ha-universal.yaml@main
+  import_full_config: false   # or false to create a local stub that includes your repo as a package
+
+bk72xx:
+  board: wb2s
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # No static IPs → use DHCP
+  ap:
+
+web_server:
+  port: 80
+  local: true
+
+logger:
+
+api:
+  encryption:
+    key: !secret esphome_api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+captive_portal:
+mdns:
+
+#
+# Button, relay and LED
+#
+binary_sensor:
+  - platform: gpio
+    pin: P11
+    name: ${model_name} Button
+    id: button
+    device_class: window
+    on_press:
+      - switch.toggle: relay
+
+switch:
+  - platform: gpio
+    pin: P6
+    name: ${model_name}
+    id: relay
+    restore_mode: RESTORE_DEFAULT_ON
+    icon: mdi:power-socket-au
+    on_turn_on:
+      - output.turn_on: button_led
+    on_turn_off:
+      - output.turn_off: button_led
+
+output:
+  - platform: gpio
+    id: button_led
+    pin: P26
+    #restore_mode: always off # default when power is turned on
+
+#
+# Power monitoring + Wi-Fi info
+#
+sensor:
+  - platform: wifi_signal
+    name: ${model_name} WiFi Signal
+    id:   ${id_prefix}_wifi_signal
+    update_interval: 30s
+
+  - platform: hlw8012
+    model: BL0937
+    sel_pin:
+      inverted: true
+      number: P24
+    cf_pin:
+      inverted: true
+      number: P7
+    cf1_pin:
+      inverted: true
+      number: P8
+    update_interval: 15s
+    initial_mode: "VOLTAGE"
+    change_mode_every: 4
+    voltage_divider:  775
+    current_resistor: 0.0009
+
+    voltage:
+      name: ${model_name} Voltage
+      id:   ${id_prefix}_voltage
+      unit_of_measurement: V
+      accuracy_decimals: 1
+      filters: [ skip_initial: 2 ]
+
+    power:
+      name: ${model_name} Power
+      id:   ${id_prefix}_power
+      unit_of_measurement: W
+      accuracy_decimals: 2
+      filters: [ skip_initial: 2 ]
+
+  - platform: template
+    name: ${model_name} Current
+    id:   ${id_prefix}_current
+    unit_of_measurement: A
+    accuracy_decimals: 2
+    update_interval: 30s
+    lambda: |-
+      return (id(${id_prefix}_power).state / id(${id_prefix}_voltage).state);
+    filters: [ skip_initial: 2 ]
+
+  - platform: uptime
+    name: ${model_name} Uptime
+    id:   ${id_prefix}_uptime
+    update_interval: 30s
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: ${model_name} IP
+    ssid:
+      name: ${model_name} WiFi SSID
+    mac_address:
+      name: ${model_name} MAC
+  # ESPHome version info
+  - platform: version
+    name: ${model_name} ESPHome Version
+    hide_timestamp: true   # show only version, e.g. "ESPHome 2025.8.3"
+  # Firmware compile date/time
+  - platform: template
+    name: ${model_name} Firmware Date
+    lambda: |-
+      return std::string(__DATE__ " " __TIME__);
