@@ -36,11 +36,11 @@ logger:
 
 api:
   encryption:
-    key: !secret esphome_api_key
+    key: !secret api_key
 
 ota:
   - platform: esphome
-    password: !secret ota_password
+    password: !secret ota_key
 
 captive_portal:
 mdns:
